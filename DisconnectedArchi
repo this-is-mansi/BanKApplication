@@ -1,0 +1,43 @@
+using System;
+using System.Data.SqlClient;
+using System.Data;
+
+namespace practice1
+{
+    internal class Program
+    {
+        static void Main(string[] args)
+        {
+            string con = "Server=LTIN519218\\SQLEXPRESS; database=Client; integrated security=SSPI";
+            using (SqlConnection conn = new SqlConnection(con))
+            {
+                try
+                {
+                    SqlDataAdapter ad = new SqlDataAdapter("Select *from Customer", conn);
+                    DataSet ds = new DataSet();
+
+                    ad.Fill(ds, "Customer");
+                    DataTable dt = ds.Tables["Customer"];
+                    DataRow dr = dt.NewRow();
+                    dr["Id"] = 4;
+                    dr["Name"] = "Sachin";
+                    dr["Email"] = "sachin@gmail.com";
+                    dr["Gender"] = "Male";
+                    dr["DOB"] = "10/10/1986";
+                    dr["Balance"] = "4000";
+
+                    SqlCommandBuilder builder = new SqlCommandBuilder(ad);
+                    dt.Rows.Add(dr);
+                    ad.Update(ds, "Customer");
+                    Console.WriteLine("done");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.Message);
+                }
+                
+            }
+            
+        }
+    }
+}
