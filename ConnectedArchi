@@ -1,0 +1,341 @@
+using System;
+using System.Data.SqlClient;
+
+namespace Bank_application
+{
+    internal class Program
+    {
+        private static string str = "Server=LTIN519218\\SQLEXPRESS;Database=Client;Integrated Security=True;";
+
+        static void Main(string[] args)
+        {
+            Program bankApp = new Program();
+            bankApp.CreateTable();
+            bankApp.Menu();
+        }
+
+        public void Menu()
+        {
+            while (true)
+            {
+                Console.WriteLine("\n--- Bank Application ---");
+                Console.WriteLine("1. Create Account");
+                Console.WriteLine("2. Login & Check Balance");
+                Console.WriteLine("3. Deposit Money");
+                Console.WriteLine("4. Withdraw Money");
+                Console.WriteLine("5. See all records");
+                Console.WriteLine("6. Exit");
+                Console.Write("Enter choice: ");
+
+                if (!int.TryParse(Console.ReadLine(), out int choice))
+                {
+                    Console.WriteLine("Invalid input! Please enter a number.");
+                    continue;
+                }
+
+                switch (choice)
+                {
+                    case 1:
+                        Console.Write("Enter Full Name (as per PAN card): ");
+                        string name = Console.ReadLine();
+                        Console.Write("Enter Email: ");
+                        string email = Console.ReadLine();
+                        Console.Write("Enter Gender (Male/Female/Other): ");
+                        string gender = Console.ReadLine();
+                        Console.Write("Enter Date of Birth (dd/MM/yyyy): ");
+                        DateTime dob;
+
+                        while (!DateTime.TryParseExact(Console.ReadLine(), "dd/MM/yyyy", null, System.Globalization.DateTimeStyles.None, out dob))
+                        {
+                            Console.Write("Invalid format. Enter Date of Birth (dd/MM/yyyy): ");
+                        }
+
+                        CreateAcc(name, email, gender, dob);
+
+                        break;
+
+                    case 2:
+                        Console.Write("Enter Customer ID: ");
+                        if (!int.TryParse(Console.ReadLine(), out int id))
+                        {
+                            Console.WriteLine("Invalid Customer ID! Please enter a valid integer.");
+                            continue;
+                        }
+                        CheckBalance(id);
+                        break;
+
+                    case 3:
+                        Console.Write("Enter Customer ID: ");
+                        if (!int.TryParse(Console.ReadLine(), out int depId))
+                        {
+                            Console.WriteLine("Invalid Customer ID! Please enter a valid integer.");
+                            continue;
+                        }
+                        Console.Write("Enter Deposit Amount: ");
+                        if (!decimal.TryParse(Console.ReadLine(), out decimal depAmount))
+                        {
+                            Console.WriteLine("Invalid amount! Please enter a valid number.");
+                            continue;
+                        }
+                        Deposit(depId, depAmount);
+                        break;
+
+                    case 4:
+                        Console.Write("Enter Customer ID: ");
+                        if (!int.TryParse(Console.ReadLine(), out int withdrawId))
+                        {
+                            Console.WriteLine("Invalid Customer ID! Please enter a valid integer.");
+                            continue;
+                        }
+                        Console.Write("Enter Withdrawal Amount: ");
+                        if (!decimal.TryParse(Console.ReadLine(), out decimal withdrawAmount))
+                        {
+                            Console.WriteLine("Invalid amount! Please enter a valid number.");
+                            continue;
+                        }
+                        Withdraw(withdrawId, withdrawAmount);
+                        break;
+                    case 5:
+                        GetAllDetails();
+                        break;
+                    case 6:
+                        Console.WriteLine("Exiting application...");
+                        return;
+
+                    default:
+                        Console.WriteLine("Invalid choice, please try again.");
+                        break;
+                }
+            }
+        }
+
+        public void CreateTable()
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+                    string sql = @"
+                    IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_NAME = 'Customer')
+                   CREATE TABLE Customer (
+                        Id INT IDENTITY(1,1) PRIMARY KEY,
+                        Name VARCHAR(255) NOT NULL,
+                        Email VARCHAR(100) UNIQUE NOT NULL,
+                        Gender VARCHAR(10) CHECK (Gender IN ('Male', 'Female', 'Other')),
+                        DOB DATE NOT NULL,
+                        Balance DECIMAL(18,2) DEFAULT 1000
+                    );"
+                    ;
+
+                    using (SqlCommand cmd = new SqlCommand(sql, conn))
+                    {
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("Table checked/created successfully.");
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    Console.WriteLine("SQL Error: " + ex.Message);
+                }
+                finally
+                {
+                    conn.Close();
+                }
+            }
+        }
+
+        public void CreateAcc(string name, string email, string gender, DateTime dob)
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+
+                    // Check if account already exists
+                    string checkQuery = "SELECT COUNT(*) FROM Customer WHERE email = @email";
+                    using (SqlCommand checkCmd = new SqlCommand(checkQuery, conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@email", email);
+                        int count = (int)checkCmd.ExecuteScalar();
+
+                        if (count > 0)
+                        {
+                            Console.WriteLine("Account already exists for this email!");
+                            return;
+                        }
+                    }
+
+                    // Insert new customer
+                    string cr = "INSERT INTO Customer (Name, Email, Gender, DOB, Balance) VALUES (@name, @email, @gender, @dob, 1000)";
+                    using (SqlCommand cmd = new SqlCommand(cr, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@name", name);
+                        cmd.Parameters.AddWithValue("@email", email);
+                        cmd.Parameters.AddWithValue("@gender", gender);
+                        cmd.Parameters.AddWithValue("@dob", dob);
+
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine("Customer account created successfully!");
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    Console.WriteLine("SQL Error: " + ex.Message);
+                }
+                finally
+                {
+                    conn.Close();
+                }
+            }
+        }
+
+
+        public void CheckBalance(int customerId)
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+                    string query = "SELECT balance FROM Customer WHERE Id = @customerId";
+
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@customerId", customerId);
+                        object result = cmd.ExecuteScalar();
+
+                        if (result != null)
+                        {
+                            Console.WriteLine($"Your Balance: {Convert.ToDecimal(result)}");
+                        }
+                        else
+                        {
+                            Console.WriteLine("Customer ID not found.");
+                        }
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    Console.WriteLine("SQL Error: " + ex.Message);
+                }
+                finally
+                {
+                    conn.Close();
+                }
+            }
+        }
+
+        public void GetAllDetails()
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+                    string query = "Select *from Customer";
+                    SqlCommand cmd = new SqlCommand(query, conn);
+                    using (SqlDataReader read = cmd.ExecuteReader())
+                    {
+                        while (read.Read())
+                        {
+                            Console.WriteLine($"CustomerId: {read.GetInt32(0)} \n Name:{read.GetString(1)} ,Gmail:{read.GetString(2)}, Gender:{read.GetString(3)}, Dob:{read.GetDateTime(4)} ");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex.ToString());
+                }
+                finally
+                {
+                    conn.Close();
+                }
+
+            }
+        }
+
+
+
+        public void Deposit(int customerId, decimal amount)
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+                    string query = "UPDATE Customer SET balance = balance + @amount WHERE Id = @customerId";
+
+                    using (SqlCommand cmd = new SqlCommand(query, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@amount", amount);
+                        cmd.Parameters.AddWithValue("@customerId", customerId);
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine($"Deposit successful! Added {amount} to your account.");
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    Console.WriteLine("SQL Error: " + ex.Message);
+                }
+                finally
+                {
+                    conn.Close();
+                }
+            }
+        }
+
+        public void Withdraw(int customerId, decimal amount)
+        {
+            using (SqlConnection conn = new SqlConnection(str))
+            {
+                try
+                {
+                    conn.Open();
+                    string checkBalanceQuery = "SELECT balance FROM Customer WHERE Id = @customerId";
+
+                    using (SqlCommand checkCmd = new SqlCommand(checkBalanceQuery, conn))
+                    {
+                        checkCmd.Parameters.AddWithValue("@customerId", customerId);
+                        object result = checkCmd.ExecuteScalar();
+
+                        if (result != null)
+                        {
+                            decimal currentBalance = Convert.ToDecimal(result);
+
+                            if (currentBalance >= amount)
+                            {
+                                string withdrawQuery = "UPDATE Customer SET balance = balance - @amount WHERE Id = @customerId";
+                                using (SqlCommand withdrawCmd = new SqlCommand(withdrawQuery, conn))
+                                {
+                                    withdrawCmd.Parameters.AddWithValue("@amount", amount);
+                                    withdrawCmd.Parameters.AddWithValue("@customerId", customerId);
+                                    withdrawCmd.ExecuteNonQuery();
+                                    Console.WriteLine($"Withdrawal successful! Remaining balance: {currentBalance - amount}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine("Insufficient balance!");
+                            }
+                        }
+                        else
+                        {
+                            Console.WriteLine("Customer ID not found.");
+                        }
+                    }
+                }
+                catch (SqlException ex)
+                {
+                    Console.WriteLine("SQL Error: " + ex.Message);
+                }
+                finally
+                {
+                    conn.Close();
+                }
+            }
+        }
+    }
+}
+
